@@ -1,0 +1,54 @@
+
+////////////descrambler///////////
+
+module data_descrambler (
+    input wire clk,
+    input wire rst,              // Active high synchronous reset
+    input wire [7:0] scrambled_data_in, 
+    input wire sync_in,
+    input wire bypass,
+    output reg [7:0] data_out   
+);
+
+  reg [15:0] x; // 16-bit LFSR register 
+
+  localparam [15:0] X_INIT = 16'hFFFF; //seed for lfsr
+
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+      x <= X_INIT;
+      data_out <= 8'h00;
+    end else begin
+      if (bypass) begin
+        data_out <= scrambled_data_in; 
+      end else begin
+        if (sync_in) begin
+          x <= X_INIT; 
+        end else begin
+          reg [15:0] next_x;
+          reg old_x_msb;
+          reg data_out_msb_input; 
+
+          old_x_msb = x[15];
+
+          // Basic circular left shift for LFSR 'x' 
+          next_x = {x[14:0], x[15]};
+
+          // Apply specific XOR feedbacks based on current 'x' values 
+          next_x[3] = x[2] ^ old_x_msb;
+          next_x[4] = x[3] ^ old_x_msb;
+          next_x[5] = x[4] ^ old_x_msb;
+
+          x <= next_x; // Update LFSR x
+
+          // Descrambling logic
+          data_out_msb_input = scrambled_data_in[0] ^ x[15];
+
+          // Shift data_out to the right and load new MSB
+          data_out <= {data_out_msb_input, data_out[7:1]};
+        end
+      end
+    end
+  end
+
+endmodule
